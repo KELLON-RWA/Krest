@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 export interface KrestApiConfig {
   secretKey: string;
@@ -27,8 +27,10 @@ export interface KrestApiClient {
   shutdown(): Promise<void>;
 }
 
-function hashConsumer(raw: string): string {
-  return createHash("sha256").update(raw).digest("hex");
+function hashConsumer(secretKey: string, raw: string): string {
+  // Keyed with the project secret so consumer identifiers cannot be correlated
+  // across projects or brute-forced by someone who only sees the hash.
+  return createHmac("sha256", secretKey).update(raw).digest("hex");
 }
 
 export function createKrestApiClient(config: KrestApiConfig): KrestApiClient {
@@ -69,7 +71,7 @@ export function createKrestApiClient(config: KrestApiConfig): KrestApiClient {
     queue.push({
       ...rest,
       latencyMs: Math.max(0, Math.round(rest.latencyMs)),
-      consumerHash: consumerId ? hashConsumer(consumerId) : undefined,
+      consumerHash: consumerId ? hashConsumer(config.secretKey, consumerId) : undefined,
     });
 
     if (queue.length >= maxBatchSize) {
@@ -129,7 +131,9 @@ export function krestExpressMiddleware(config: KrestApiConfig) {
       const latencyMs = performance.now() - start;
       const consumerHeader = req.headers["x-api-key"] || req.headers["x-consumer-id"];
       const consumerId = Array.isArray(consumerHeader) ? consumerHeader[0] : consumerHeader;
-      const sdkHeader = req.headers["x-stellar-sdk"] || req.headers["user-agent"];
+      // Only a coarse, explicitly-provided SDK name is recorded. The raw
+      // User-Agent is never persisted (see the privacy model).
+      const sdkHeader = req.headers["x-stellar-sdk"];
       const sdkName = Array.isArray(sdkHeader) ? sdkHeader[0]?.slice(0, 64) : sdkHeader?.slice(0, 64);
 
       client.record({

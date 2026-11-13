@@ -26,6 +26,13 @@ export interface WebEventPayload {
 
 const MAX_BATCH = 20;
 
+function doNotTrackEnabled(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const legacy = (navigator as Navigator & { msDoNotTrack?: string }).msDoNotTrack;
+  const dnt = navigator.doNotTrack ?? legacy;
+  return dnt === "1" || dnt === "yes";
+}
+
 class KrestClient {
   private config: KrestConfig | null = null;
   private queue: WebEventPayload[] = [];
@@ -39,7 +46,7 @@ class KrestClient {
       throw new Error("@krest/sdk-web: publicKey and endpoint are required");
     }
 
-    if (config.respectDnt && navigator.doNotTrack === "1") {
+    if (config.respectDnt && doNotTrackEnabled()) {
       return;
     }
 
@@ -146,24 +153,47 @@ class KrestClient {
       this.timer = null;
     }
 
-    const batch = this.queue.splice(0, MAX_BATCH);
-    const url = `${this.config.endpoint}/v1/ingest/web`;
-    const body = JSON.stringify({
-      publicKey: this.config.publicKey,
-      events: batch,
-    });
-
-    if (useBeacon && typeof navigator.sendBeacon === "function") {
-      const blob = new Blob([body], { type: "application/json" });
-      const sent = navigator.sendBeacon(url, blob);
-      if (sent) return;
+    if (useBeacon) {
+      // On tab hide/unload, drain the whole queue in MAX_BATCH chunks so a
+      // backlog larger than one batch is not silently dropped.
+      while (this.queue.length > 0) {
+        const batch = this.queue.splice(0, MAX_BATCH);
+        if (!this.sendWithBeacon(batch)) {
+          this.sendWithFetch(batch);
+        }
+      }
+      return;
     }
 
+    this.sendWithFetch(this.queue.splice(0, MAX_BATCH));
+    if (this.queue.length > 0) {
+      this.scheduleFlush();
+    }
+  }
+
+  private sendWithBeacon(batch: WebEventPayload[]): boolean {
+    if (typeof navigator.sendBeacon !== "function") return false;
+    const url = `${this.config!.endpoint}/v1/ingest/web`;
+    const body = JSON.stringify({
+      publicKey: this.config!.publicKey,
+      events: batch,
+    });
+    const blob = new Blob([body], { type: "application/json" });
+    return navigator.sendBeacon(url, blob);
+  }
+
+  private sendWithFetch(batch: WebEventPayload[]): void {
+    if (batch.length === 0) return;
+    const url = `${this.config!.endpoint}/v1/ingest/web`;
+    const body = JSON.stringify({
+      publicKey: this.config!.publicKey,
+      events: batch,
+    });
     void fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-krest-key": this.config.publicKey,
+        "x-krest-key": this.config!.publicKey,
       },
       body,
       keepalive: true,
@@ -173,15 +203,21 @@ class KrestClient {
     });
   }
 
+  private scheduleFlush(): void {
+    if (this.timer) return;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.flush(false);
+    }, this.config?.flushIntervalMs ?? 1500);
+  }
+
   private enqueue(event: WebEventPayload): void {
     this.queue.push(event);
     if (this.queue.length >= MAX_BATCH) {
       this.flush(false);
       return;
     }
-    if (!this.timer) {
-      this.timer = setTimeout(() => this.flush(false), this.config?.flushIntervalMs ?? 1500);
-    }
+    this.scheduleFlush();
   }
 
   private hookSpaNavigation(): void {
