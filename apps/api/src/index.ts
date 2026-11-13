@@ -63,6 +63,15 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
 });
 
+app.get("/", async (_request, reply) => {
+  return reply.send({
+    service: "krest-api",
+    status: "ok",
+    health: "/health",
+    sdk: "/krest.js",
+  });
+});
+
 app.get("/health", async (_request, reply) => {
   try {
     await db.execute(sql`SELECT 1`);
