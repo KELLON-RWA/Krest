@@ -18,6 +18,8 @@ const updateProjectSchema = z.object({
   shareWithEcosystem: z.boolean().optional(),
 });
 
+const idSchema = z.string().uuid("Invalid project id");
+
 function toSlug(name: string): string {
   const base = name
     .toLowerCase()
@@ -98,6 +100,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     if (!user) return;
 
     const { id } = request.params as { id: string };
+    if (!idSchema.safeParse(id).success) {
+      return reply.code(400).send({ error: "Invalid project id" });
+    }
     const [project] = await db
       .select({
         id: projects.id,
@@ -125,6 +130,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     if (!user) return;
 
     const { id } = request.params as { id: string };
+    if (!idSchema.safeParse(id).success) {
+      return reply.code(400).send({ error: "Invalid project id" });
+    }
     const parsed = updateProjectSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid update payload", details: parsed.error.flatten() });
@@ -160,6 +168,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     if (!user) return;
 
     const { id } = request.params as { id: string };
+    if (!idSchema.safeParse(id).success) {
+      return reply.code(400).send({ error: "Invalid project id" });
+    }
     const keys = generateProjectKeys();
 
     const [updated] = await db
@@ -194,6 +205,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     if (!user) return;
 
     const { id } = request.params as { id: string };
+    if (!idSchema.safeParse(id).success) {
+      return reply.code(400).send({ error: "Invalid project id" });
+    }
     const deleted = await db
       .delete(projects)
       .where(and(eq(projects.id, id), eq(projects.userId, user.id)))

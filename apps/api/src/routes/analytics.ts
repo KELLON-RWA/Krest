@@ -28,6 +28,9 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
     if (!user) return;
 
     const { id } = request.params as { id: string };
+    if (!z.string().uuid().safeParse(id).success) {
+      return reply.code(400).send({ error: "Invalid project id" });
+    }
     const parsedQuery = querySchema.safeParse(request.query);
     if (!parsedQuery.success) {
       return reply.code(400).send({ error: "Invalid range parameter" });

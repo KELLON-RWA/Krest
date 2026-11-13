@@ -19,9 +19,18 @@ export async function ecosystemRoutes(app: FastifyInstance): Promise<void> {
 
     const [projectsRes, webRes, apiRes, walletsRes, networksRes, dailyRes] = await Promise.all([
       db.execute(sql`
-        SELECT COUNT(*)::int AS participating_projects
-        FROM projects
-        WHERE share_with_ecosystem = true
+        SELECT COUNT(DISTINCT project_id)::int AS participating_projects
+        FROM (
+          SELECT w.project_id
+          FROM web_events w
+          INNER JOIN projects p ON p.id = w.project_id
+          WHERE p.share_with_ecosystem = true AND w.created_at >= ${since}
+          UNION
+          SELECT a.project_id
+          FROM api_events a
+          INNER JOIN projects p ON p.id = a.project_id
+          WHERE p.share_with_ecosystem = true AND a.created_at >= ${since}
+        ) active_projects
       `),
       db.execute(sql`
         SELECT

@@ -37,62 +37,81 @@ function cookieOptions() {
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/v1/auth/signup", async (request, reply) => {
-    const parsed = signupSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid signup payload", details: parsed.error.flatten() });
+  app.post(
+    "/v1/auth/signup",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = signupSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Invalid signup payload", details: parsed.error.flatten() });
+      }
+
+      const { email, name, password } = parsed.data;
+      const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+      if (existing.length > 0) {
+        return reply.code(409).send({ error: "An account with this email already exists" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      let created: { id: string; email: string; name: string };
+      try {
+        [created] = await db
+          .insert(users)
+          .values({ email, name, passwordHash })
+          .returning({ id: users.id, email: users.email, name: users.name });
+      } catch (err) {
+        // Unique violation from a concurrent signup for the same email.
+        if ((err as { code?: string }).code === "23505") {
+          return reply.code(409).send({ error: "An account with this email already exists" });
+        }
+        throw err;
+      }
+
+      const token = generateSessionToken();
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+      await db.insert(sessions).values({
+        userId: created.id,
+        tokenHash: sha256Hex(token),
+        expiresAt,
+      });
+
+      reply.setCookie(SESSION_COOKIE_NAME, token, cookieOptions());
+      return reply.code(201).send({ user: created, token });
     }
+  );
 
-    const { email, name, password } = parsed.data;
-    const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-    if (existing.length > 0) {
-      return reply.code(409).send({ error: "An account with this email already exists" });
+  app.post(
+    "/v1/auth/login",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = loginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Invalid login payload" });
+      }
+
+      const { email, password } = parsed.data;
+      const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (!user || !(await verifyPassword(password, user.passwordHash))) {
+        return reply.code(401).send({ error: "Invalid email or password" });
+      }
+
+      const token = generateSessionToken();
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+      await db.insert(sessions).values({
+        userId: user.id,
+        tokenHash: sha256Hex(token),
+        expiresAt,
+      });
+
+      reply.setCookie(SESSION_COOKIE_NAME, token, cookieOptions());
+      // `token` is returned for non-browser (Bearer) clients. The dashboard uses
+      // the HttpOnly cookie and never stores this value.
+      return reply.send({
+        user: { id: user.id, email: user.email, name: user.name },
+        token,
+      });
     }
-
-    const passwordHash = await hashPassword(password);
-    const [created] = await db
-      .insert(users)
-      .values({ email, name, passwordHash })
-      .returning({ id: users.id, email: users.email, name: users.name });
-
-    const token = generateSessionToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-    await db.insert(sessions).values({
-      userId: created.id,
-      tokenHash: sha256Hex(token),
-      expiresAt,
-    });
-
-    reply.setCookie(SESSION_COOKIE_NAME, token, cookieOptions());
-    return reply.code(201).send({ user: created, token });
-  });
-
-  app.post("/v1/auth/login", async (request, reply) => {
-    const parsed = loginSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid login payload" });
-    }
-
-    const { email, password } = parsed.data;
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (!user || !(await verifyPassword(password, user.passwordHash))) {
-      return reply.code(401).send({ error: "Invalid email or password" });
-    }
-
-    const token = generateSessionToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-    await db.insert(sessions).values({
-      userId: user.id,
-      tokenHash: sha256Hex(token),
-      expiresAt,
-    });
-
-    reply.setCookie(SESSION_COOKIE_NAME, token, cookieOptions());
-    return reply.send({
-      user: { id: user.id, email: user.email, name: user.name },
-      token,
-    });
-  });
+  );
 
   app.post("/v1/auth/logout", async (request, reply) => {
     const cookieToken = request.cookies?.[SESSION_COOKIE_NAME];
