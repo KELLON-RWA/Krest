@@ -13,7 +13,7 @@ Copy your snippet from **Dashboard → Install & Settings** and place it in `<he
 ```
 
 Optional attributes:
-- `data-krest-dnt="true"` — Respects the browser's `Do Not Track` (`navigator.doNotTrack === "1"`) header.
+- `data-krest-dnt="true"` — Respects the browser's `Do Not Track` signal (`"1"` or legacy `"yes"`).
 - `data-krest-endpoint="https://..."` — Overrides the ingestion endpoint (defaults to the script's origin).
 
 This automatically tracks:

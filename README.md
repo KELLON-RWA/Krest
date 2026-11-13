@@ -16,17 +16,17 @@ Privacy-first Web, Stellar/Soroban, and API analytics platform.
 
 ## Local Setup
 
-1. Copy `.env.example` to `apps/api/.env` and `apps/web/.env.local` and fill in your Neon `DATABASE_URL` and `AUTH_SECRET`.
+1. Copy `.env.example` to `apps/api/.env` and `apps/web/.env.local` and fill in your Neon `DATABASE_URL`.
 2. Install and build packages:
    ```bash
    pnpm install
    pnpm build
    ```
-3. Push the Drizzle schema to Neon PostgreSQL:
+3. Apply the database schema (use `db:push` only for disposable local databases):
    ```bash
    pnpm db:push
    ```
-4. Run API and Web in separate terminals:
+4. Run API (port `4100`) and Web (port `3000`) in separate terminals:
    ```bash
    pnpm dev:api
    pnpm dev:web
@@ -34,26 +34,37 @@ Privacy-first Web, Stellar/Soroban, and API analytics platform.
 
 ## Production Deployment
 
-### 1. Backend (`apps/api` on VPS at `api.krest.kellon.xy`)
+Canonical hosts: dashboard `krest.kellon.xyz`, API/SDK `api-krest.kellon.xyz`.
+
+### 1. Backend (`apps/api` on VPS at `api-krest.kellon.xyz`)
+
+Generate and apply migrations against your production database:
+```bash
+pnpm db:generate   # when the schema changes, commit apps/api/drizzle/
+pnpm db:migrate
+```
+
 Set environment variables on your VPS:
 ```env
 NODE_ENV=production
-PORT=4000
-HOST=0.0.0.0
+PORT=4100
+HOST=127.0.0.1
 DATABASE_URL=postgresql://... # Neon pooled URL
-AUTH_SECRET=<random-64-char-hex>
-CORS_ORIGIN=https://krest.kellon.xy
-COOKIE_DOMAIN=.krest.kellon.xy
+CORS_ORIGIN=https://krest.kellon.xyz
+COOKIE_DOMAIN=.kellon.xyz
 TRUST_PROXY=true
+EVENT_RETENTION_DAYS=90
 ```
+`CORS_ORIGIN` is enforced for credentialed dashboard routes; public ingestion is open by design. `TRUST_PROXY=true` is required behind a reverse proxy so visitor hashes see real client IPs.
+
 Run with Docker (`apps/api/Dockerfile`) or Node 22 + PM2, behind Caddy:
 ```caddyfile
-api.krest.kellon.xy {
-    reverse_proxy localhost:4000
+api-krest.kellon.xyz {
+    reverse_proxy localhost:4100
 }
 ```
 
-### 2. Frontend (`apps/web` on Vercel at `krest.kellon.xy`)
+### 2. Frontend (`apps/web` on Vercel at `krest.kellon.xyz`)
 - Root Directory: `apps/web`
 - Build Command: `pnpm --filter @krest/web build`
-- Env Var: `NEXT_PUBLIC_API_URL=https://api.krest.kellon.xy`
+- Env Var: `NEXT_PUBLIC_API_URL=https://api-krest.kellon.xyz`

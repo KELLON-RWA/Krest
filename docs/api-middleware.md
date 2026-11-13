@@ -26,7 +26,8 @@ app.use(
 What it captures automatically:
 - HTTP `method` and matched `route` (query strings are stripped)
 - `statusCode` and `latencyMs` (measured with `performance.now()`)
-- `consumerHash` (SHA-256 of `x-api-key` or `x-consumer-id` if present—raw keys are never transmitted)
+- `consumerHash` (secret-keyed HMAC-SHA256 of `x-api-key` or `x-consumer-id` if present—raw keys are never transmitted and hashes cannot be correlated across projects)
+- `sdkName` (optional coarse `x-stellar-sdk` value only; the raw User-Agent is never sent or stored)
 - `errorType` (`client_error` for 4xx, `server_error` for 5xx)
 
 ## 2. Next.js App Router Wrapper

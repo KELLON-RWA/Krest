@@ -11,8 +11,15 @@ Create a PostgreSQL database (e.g., on Neon) and obtain the pooled `DATABASE_URL
 From the repo root with `apps/api/.env` configured:
 
 ```bash
+# Production: apply tracked migrations
+pnpm db:migrate
+
+# Local throwaway databases only
 pnpm db:push
 ```
+
+When changing `apps/api/src/db/schema.ts`, run `pnpm db:generate` and commit the
+generated `apps/api/drizzle/` files.
 
 ---
 
@@ -33,11 +40,15 @@ NODE_ENV=production
 PORT=4100
 HOST=127.0.0.1
 DATABASE_URL=postgresql://...
-AUTH_SECRET=<64-char-random-hex>
 CORS_ORIGIN=https://krest.kellon.xyz
 COOKIE_DOMAIN=.kellon.xyz
 TRUST_PROXY=true
+EVENT_RETENTION_DAYS=90
 ```
+
+- `CORS_ORIGIN` is enforced for credentialed dashboard routes (comma-separate multiple origins).
+- `TRUST_PROXY=true` is required so `visitorHash` uses the client IP, not the proxy IP.
+- `EVENT_RETENTION_DAYS` controls the daily purge of raw events (`0` keeps them forever).
 
 Start with PM2:
 
