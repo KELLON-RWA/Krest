@@ -13,6 +13,9 @@ export default function HomePage() {
             <span>Krest</span>
           </div>
           <nav className="flex items-center gap-6 text-sm text-zinc-400">
+            <Link href="/docs" className="hover:text-zinc-100 transition-colors">
+              Docs
+            </Link>
             <Link href="/ecosystem" className="hover:text-zinc-100 transition-colors">
               Ecosystem Rollup
             </Link>

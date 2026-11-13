@@ -205,6 +205,9 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4 text-xs text-zinc-400">
+            <Link href="/docs" className="hover:text-zinc-200">
+              Docs
+            </Link>
             <Link href="/ecosystem" className="hover:text-zinc-200">
               Ecosystem
             </Link>

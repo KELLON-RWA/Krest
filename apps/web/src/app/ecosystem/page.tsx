@@ -43,6 +43,9 @@ export default function EcosystemPage() {
             <span>Krest</span>
           </Link>
           <div className="flex items-center gap-4 text-sm">
+            <Link href="/docs" className="text-zinc-300 hover:text-white">
+              Docs
+            </Link>
             <Link href="/dashboard" className="text-zinc-300 hover:text-white">
               Dashboard
             </Link>
