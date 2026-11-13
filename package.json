@@ -1,0 +1,19 @@
+{
+  "name": "krest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Privacy-first Web and API Analytics for the Stellar Ecosystem",
+  "scripts": {
+    "dev:api": "pnpm --filter @krest/api dev",
+    "dev:web": "pnpm --filter @krest/web dev",
+    "build": "pnpm --filter @krest/sdk-web build && pnpm --filter @krest/middleware-node build && pnpm --filter @krest/api build && pnpm --filter @krest/web build",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @krest/api db:generate",
+    "db:migrate": "pnpm --filter @krest/api db:migrate",
+    "db:push": "pnpm --filter @krest/api db:push"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
