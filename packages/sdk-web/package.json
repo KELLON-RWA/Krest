@@ -2,6 +2,15 @@
   "name": "@krest/sdk-web",
   "version": "0.1.0",
   "description": "Privacy-first Web and Stellar dApp analytics SDK",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KELLON-RWA/Krest.git",
+    "directory": "packages/sdk-web"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
